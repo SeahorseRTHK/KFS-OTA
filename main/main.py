@@ -1,4 +1,4 @@
-Version = "v1.1"
+Version = "v1.2"
 import network, usocket, ussl, sensor, image, machine, time, gc, micropython, senko
 from mqtt import MQTTClient
 GithubURL = "https://github.com/SeahorseRTHK/KFS-OTA/blob/main/main/"
@@ -47,7 +47,7 @@ def callback(topic, msg):
 	if msg == b'lineimage' or msg == b'linephoto':
 		message = "OpenMV-CAM " + Version + ", photo"
 		sendLINEphoto(message)
-	if msg == b'image' or msg == b'photo':
+	if msg == b'mqttimage' or msg == b'mqttphoto':
 		sensor.set_framesize(sensor.QVGA)
 		sensor.set_windowing(240,240)
 		img = sensor.snapshot().compress(quality=50)
