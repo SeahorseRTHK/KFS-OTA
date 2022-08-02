@@ -1,4 +1,4 @@
-Version = "v1.5"
+Version = "v1.6"
 import os, network, usocket, ussl, sensor, image, machine, time, gc, micropython, senko
 from mqtt import MQTTClient
 GithubURL = "https://github.com/SeahorseRTHK/KFS-OTA/blob/main/main/"
@@ -9,7 +9,7 @@ sensor.set_framesize(sensor.UXGA)
 sensor.skip_frames(time = 2000)
 PORT = 443
 HOST = "notify-api.line.me"
-token = "qBx4XoGPSJU9zxy3tYLBnbt31AFVVGXD35GC6nlJr28"
+token = "MPkSNSnyyyxkeUqaGrcHZxtG6LNTj5vazBJmhtYshew"
 SSID="Seahorse"
 KEY="789456123"
 print("Trying to connect... (may take a while)...")
@@ -52,18 +52,27 @@ def callback(topic, msg):
 	if msg == b'details':
 		f = open("camInfo.txt", "r")
 		info = f.read()
-		message = "OpenMV-CAM " + Version
+		f.close()
+		message = info + Version + ". IP: " + wlan.ifconfig()[0] + ". RSSI: " + str(wlan.rssi())
 		sendLINEmsg(message)
-	if msg == b'lineimage' or msg == b'linephoto':
+	elif msg == b'grayscale':
+		sensor.set_pixformat(sensor.GRAYSCALE)
+		message = "Camera set to grayscale"
+		sendLINEmsg(message)
+	elif msg == b'rgb565':
+		sensor.set_pixformat(sensor.RGB565)
+		message = "Camera set to RGB565"
+		sendLINEmsg(message)
+	elif msg == b'lineimage' or msg == b'linephoto':
 		message = "OpenMV-CAM " + Version + ", photo"
 		sendLINEphoto(message)
-	if msg == b'mqttimage' or msg == b'mqttphoto':
+	elif msg == b'mqttimage' or msg == b'mqttphoto':
 		sensor.set_framesize(sensor.QVGA)
 		sensor.set_windowing(240,240)
 		img = sensor.snapshot().compress(quality=50)
 		MQTT.publish("86Box/Photo", img)
 		del img
-	if msg == b'update':
+	elif msg == b'update':
 		print("Updating")
 		try:
 			print("Try")
@@ -75,6 +84,12 @@ def callback(topic, msg):
 			print("Except")
 			micropython.mem_info()
 			print("Not updated!")
+	elif msg == b'help':
+		message = "commands:\ndetails\ngrayscale\nrgb565\nlineimage\nlinephoto\nmqttimage\nmqttphoto\nupdate\nhelp"
+		sendLINEmsg(message)
+	else:
+		message = "Received invalid command: " + msg.decode('UTF-8') + ". Send command help to get help"
+		sendLINEmsg(message)
 MQTT.set_callback(callback)
 MQTT.subscribe(mainTopic + "/command")
 def sendMQTT(subTopic, msg):
@@ -169,8 +184,8 @@ except OSError:
 	print("Created new camInfo.txt file with cam:no-setting-is-available")
 	f.close()
 finally:
-	MQTT.publish(mainTopic, message + " is online")
-	sendLINEmsg(message + " is online")
+	MQTT.publish(mainTopic, message + "-" + Version + " is online")
+	sendLINEmsg(message + "-" + Version + " is online")
 	time.sleep_ms(500)
 f = open("camInfo.txt", "r")
 temp = f.read(4)
@@ -201,8 +216,9 @@ if temp == "cam:":
 				f.write(read)
 				f.close()
 				print("Set, restarting")
+				machine.reset()
 			del img
-			time.sleep_ms(500)
+			time.sleep_ms(100)
 	else:
 		info = message.split("-")
 		print(info)
