@@ -62,7 +62,7 @@ def callback(topic, msg):
 		f = open("camInfo.txt", "r")
 		info = f.read()
 		f.close()
-		message = info + Version + ". IP: " + wlan.ifconfig()[0] + ". RSSI: " + str(wlan.rssi())
+		message = info + "-" + Version + ". IP: " + wlan.ifconfig()[0] + ". RSSI: " + str(wlan.rssi())
 		sendLINEmsg(message)
 	elif msg == b'grayscale':
 		sensor.set_pixformat(sensor.GRAYSCALE)
