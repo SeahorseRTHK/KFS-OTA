@@ -84,15 +84,14 @@ def callback(topic, msg):
 		del img
 	elif msg == b'update':
 		print("Updating")
+		sendLINEmsg("Attempting update")
 		try:
-			print("Try")
-			micropython.mem_info()
 			if OTA.update():
+				sendLINEmsg("Update complete! Restarting")
 				print("Updated to the latest version! Rebooting...")
 				machine.reset()
 		except:
-			print("Except")
-			micropython.mem_info()
+			sendLINEmsg("Failed to update")
 			print("Not updated!")
 	elif msg == b'restart':
 		print("Restarting")
