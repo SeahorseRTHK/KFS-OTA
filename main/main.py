@@ -1,4 +1,4 @@
-Version = "v1.6"
+Version = "v1.7"
 import os, network, usocket, ussl, sensor, image, machine, time, gc, micropython, senko
 from mqtt import MQTTClient
 GithubURL = "https://github.com/SeahorseRTHK/KFS-OTA/blob/main/main/"
@@ -9,7 +9,7 @@ sensor.set_framesize(sensor.UXGA)
 sensor.skip_frames(time = 2000)
 PORT = 443
 HOST = "notify-api.line.me"
-token = "MPkSNSnyyyxkeUqaGrcHZxtG6LNTj5vazBJmhtYshew"
+token = "qBx4XoGPSJU9zxy3tYLBnbt31AFVVGXD35GC6nlJr28"
 SSID="Seahorse"
 KEY="789456123"
 print("Trying to connect... (may take a while)...")
@@ -18,10 +18,13 @@ try:
 	wlan.connect(SSID, key=KEY, security=wlan.WPA_PSK)
 	print(wlan.ifconfig())
 except OSError:
-	print("Failed to connect to WiFi, trying again after 3 seconds")
-	time.sleep(3.0)
-	wlan.connect(SSID, key=KEY, security=wlan.WPA_PSK)
-	print(wlan.ifconfig())
+	try:
+		print("Failed to connect to WiFi, trying again after 3 seconds")
+		time.sleep_ms(3000)
+		wlan.connect(SSID, key=KEY, security=wlan.WPA_PSK)
+		print(wlan.ifconfig())
+	except:
+		machine.reset()
 except:
 	print("Failed again, restarting")
 	machine.reset()
@@ -29,8 +32,11 @@ try:
 	addr = usocket.getaddrinfo(HOST, PORT)[0][-1]
 	print(addr)
 except OSError:
-	addr = usocket.getaddrinfo(HOST, PORT)[0][-1]
-	print(addr)
+	try:
+		addr = usocket.getaddrinfo(HOST, PORT)[0][-1]
+		print(addr)
+	except:
+		machine.reset()
 except:
 	machine.reset()
 mainTopic = "OpenMV"
@@ -40,10 +46,13 @@ try:
 	MQTT.connect()
 	print("Connected to MQTT server")
 except OSError:
-	print("Failed to connect to MQTT server, trying again after 3 seconds")
-	time.sleep(3.0)
-	MQTT.connect()
-	print("Connected to MQTT server")
+	try:
+		print("Failed to connect to MQTT server, trying again after 3 seconds")
+		time.sleep_ms(3000)
+		MQTT.connect()
+		print("Connected to MQTT server")
+	except:
+		machine.reset()
 except:
 	print("doing machine reset")
 	machine.reset()
@@ -69,7 +78,8 @@ def callback(topic, msg):
 	elif msg == b'mqttimage' or msg == b'mqttphoto':
 		sensor.set_framesize(sensor.QVGA)
 		sensor.set_windowing(240,240)
-		img = sensor.snapshot().compress(quality=50)
+		img = sensor.snapshot().compress(quality=75)
+		print(img)
 		MQTT.publish("86Box/Photo", img)
 		del img
 	elif msg == b'update':
@@ -84,14 +94,18 @@ def callback(topic, msg):
 			print("Except")
 			micropython.mem_info()
 			print("Not updated!")
+	elif msg == b'restart':
+		print("Restarting")
+		sendLINEmsg("Command received, restarting")
 	elif msg == b'help':
-		message = "commands:\ndetails\ngrayscale\nrgb565\nlineimage\nlinephoto\nmqttimage\nmqttphoto\nupdate\nhelp"
+		message = "commands:\ndetails\ngrayscale\nrgb565\nlineimage OR linephoto\nmqttimage OR mqttphoto\nupdate\nrestart\nhelp"
 		sendLINEmsg(message)
 	else:
 		message = "Received invalid command: " + msg.decode('UTF-8') + ". Send command help to get help"
 		sendLINEmsg(message)
 MQTT.set_callback(callback)
 MQTT.subscribe(mainTopic + "/command")
+MQTT.set_last_will(mainTopic, "OFFLINE")
 def sendMQTT(subTopic, msg):
 	subTopic = mainTopic + "/" + subTopic
 	MQTT.publish(subTopic, msg)
@@ -231,16 +245,57 @@ else:
 	f.write("cam:no-setting-is-available")
 	f.close()
 	machine.reset()
-while (wlan.isconnected() == True):
-	print("waiting")
-	MQTT.wait_msg()
-else:
-	print("WiFi not connected, connecting")
-	wlan.connect(SSID, key=KEY, security=wlan.WPA_PSK)
-	print(wlan.ifconfig())
-	addr = usocket.getaddrinfo(HOST, PORT)[0][-1]
-	print(addr)
-	MQTT.connect()
-	MQTT.set_callback(callback)
-	MQTT.subscribe(mainTopic + "/command")
-	MQTT.publish(mainTopic, "OpenMV ONLINE!")
+while True:
+	try:
+		while (wlan.isconnected() == True):
+			print("waiting")
+			MQTT.wait_msg()
+	except:
+		time.sleep_ms(2000)
+		if (wlan.isconnected() == False):
+			print("WiFi not connected, retrying in 5 seconds")
+			time.sleep_ms(5000)
+			print("Trying to connect now")
+			try:
+				wlan.connect(SSID, key=KEY, security=wlan.WPA_PSK)
+				print(wlan.ifconfig())
+			except OSError:
+				try:
+					print("Failed to connect to WiFi, trying again after 5 seconds")
+					time.sleep_ms(5000)
+					wlan.connect(SSID, key=KEY, security=wlan.WPA_PSK)
+					print(wlan.ifconfig())
+				except:
+					machine.reset()
+			except:
+				print("Failed again, restarting")
+				machine.reset()
+			try:
+				addr = usocket.getaddrinfo(HOST, PORT)[0][-1]
+				print(addr)
+			except OSError:
+				try:
+					addr = usocket.getaddrinfo(HOST, PORT)[0][-1]
+					print(addr)
+				except:
+					machine.reset()
+			except:
+				machine.reset()
+			try:
+				print("Connecting to MQTT server")
+				MQTT.connect()
+				print("Connected to MQTT server")
+			except OSError:
+				try:
+					print("Failed to connect to MQTT server, trying again after 3 seconds")
+					time.sleep_ms(3000)
+					MQTT.connect()
+					print("Connected to MQTT server")
+				except:
+					machine.reset()
+			except:
+				print("doing machine reset")
+				machine.reset()
+		else:
+			print("Unknown error, restarting")
+			machine.reset()
