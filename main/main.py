@@ -9,7 +9,7 @@ sensor.set_framesize(sensor.UXGA)
 sensor.skip_frames(time = 2000)
 PORT = 443
 HOST = "notify-api.line.me"
-token = "qBx4XoGPSJU9zxy3tYLBnbt31AFVVGXD35GC6nlJr28"
+token = "MPkSNSnyyyxkeUqaGrcHZxtG6LNTj5vazBJmhtYshew"
 SSID="Seahorse"
 KEY="789456123"
 print("Trying to connect... (may take a while)...")
