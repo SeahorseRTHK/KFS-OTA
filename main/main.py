@@ -189,6 +189,16 @@ def sendLINEphoto(msg,img):
 	print(LINE_Notify.read())
 	print("")
 	LINE_Notify.close()
+def detectFeed():
+	sensor.set_framesize(sensor.UXGA)
+	img = sensor.snapshot()
+	for i, detection_list in enumerate(net.detect(img, thresholds=[(128, 255)])):
+		if (i < len(labels)):
+			print("********** %s **********" % labels[i])
+		for d in detection_list:
+			print(d)
+			img.draw_rectangle(d.rect(), color=colors[i])
+	sendLINEphoto("Feed detection", img)
 try:
 	print("Reading file")
 	f = open("camInfo.txt", "r")
@@ -250,6 +260,12 @@ else:
 	f.write("cam:no-setting-is-available")
 	f.close()
 	machine.reset()
+net = tf.load('trained.tflite', load_to_fb=True)
+labels = []
+try:
+	labels = [line.rstrip('\n') for line in open("labels.txt")]
+except:
+	pass
 colors = [
 	(255,   0,   0),
 	(  0, 255,   0),
