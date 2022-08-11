@@ -1,8 +1,8 @@
-Version = "v1.7"
-import os, network, usocket, ussl, sensor, image, machine, time, gc, micropython, senko
+Version = "v1.8"
+import os, network, usocket, ussl, sensor, image, machine, time, gc, micropython, tf, senko
 from mqtt import MQTTClient
 GithubURL = "https://github.com/SeahorseRTHK/KFS-OTA/blob/main/main/"
-OTA = senko.Senko(user="SeahorseRTHK", repo="KFS-OTA", working_dir="main", files=["main.py"])
+OTA = senko.Senko(user="SeahorseRTHK", repo="KFS-OTA", working_dir="main", files=["main.py","labels.txt","trained.tflite"])
 sensor.reset()
 sensor.set_pixformat(sensor.RGB565)
 sensor.set_framesize(sensor.UXGA)
@@ -10,8 +10,8 @@ sensor.skip_frames(time = 2000)
 PORT = 443
 HOST = "notify-api.line.me"
 token = "MPkSNSnyyyxkeUqaGrcHZxtG6LNTj5vazBJmhtYshew"
-SSID="Seahorse"
-KEY="789456123"
+SSID="SEAHORSE@unifi"
+KEY="SH42827AU"
 print("Trying to connect... (may take a while)...")
 wlan = network.WINC()
 try:
@@ -74,7 +74,7 @@ def callback(topic, msg):
 		sendLINEmsg(message)
 	elif msg == b'lineimage' or msg == b'linephoto':
 		message = "OpenMV-CAM " + Version + ", photo"
-		sendLINEphoto(message)
+		sendLINEphoto(message, None)
 	elif msg == b'mqttimage' or msg == b'mqttphoto':
 		sensor.set_framesize(sensor.QVGA)
 		sensor.set_windowing(240,240)
@@ -96,8 +96,11 @@ def callback(topic, msg):
 	elif msg == b'restart':
 		print("Restarting")
 		sendLINEmsg("Command received, restarting")
+	elif msg == b'detectfeed':
+		print("Detecting feed")
+		detectFeed()
 	elif msg == b'help':
-		message = "commands:\ndetails\ngrayscale\nrgb565\nlineimage OR linephoto\nmqttimage OR mqttphoto\nupdate\nrestart\nhelp"
+		message = "commands:\ndetails\ngrayscale\nrgb565\nlineimage OR linephoto\nmqttimage OR mqttphoto\ndetectfeed\nupdate\nrestart\nhelp"
 		sendLINEmsg(message)
 	else:
 		message = "Received invalid command: " + msg.decode('UTF-8') + ". Send command help to get help"
@@ -138,7 +141,7 @@ def sendLINEmsg(msg):
 	print(LINE_Notify.read())
 	gc.collect()
 	LINE_Notify.close()
-def sendLINEphoto(msg):
+def sendLINEphoto(msg,img):
 	LINE_Notify = usocket.socket(usocket.AF_INET, usocket.SOCK_STREAM)
 	LINE_Notify.connect(addr)
 	LINE_Notify.settimeout(5.0)
@@ -147,11 +150,14 @@ def sendLINEphoto(msg):
 		message = "OpenMV-CAM"
 	else:
 		message = msg
-	sensor.set_framesize(sensor.UXGA)
-	sensor.set_windowing(1600,1200)
+	if img is None:
+		sensor.set_framesize(sensor.UXGA)
+		sensor.set_windowing(1600,1200)
+		img = sensor.snapshot().compress(quality=95)
+	else:
+		img = img.compress(quality=95)
 	head = "--Taiwan\r\nContent-Disposition: form-data; name=\"message\"; \r\n\r\n" + message + "\r\n--Taiwan\r\nContent-Disposition: form-data; name=\"imageFile\"; filename=\"OpenMV-CAM.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n"
 	tail = "\r\n--Taiwan--\r\n"
-	img = sensor.snapshot().compress(quality=95)
 	totalLen = str(len(head) + len(tail) + len(img.bytearray()))
 	print("totalLen is " + totalLen)
 	request = "POST /api/notify HTTP/1.1\r\n"
@@ -244,6 +250,15 @@ else:
 	f.write("cam:no-setting-is-available")
 	f.close()
 	machine.reset()
+colors = [
+	(255,   0,   0),
+	(  0, 255,   0),
+	(255, 255,   0),
+	(  0,   0, 255),
+	(255,   0, 255),
+	(  0, 255, 255),
+	(255, 255, 255),
+]
 while True:
 	try:
 		while (wlan.isconnected() == True):
