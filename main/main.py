@@ -190,18 +190,17 @@ def sendLINEphoto(msg,img):
 	print("")
 	LINE_Notify.close()
 def detectFeed():
+	result = "Classes:\n"
 	sensor.set_framesize(sensor.UXGA)
 	img = sensor.snapshot()
-	for i, detection_list in enumerate(net.detect(img, thresholds=[(128, 255)])):
-		if (i < len(labels)):
-			print("********** %s **********" % labels[i])
-		for d in detection_list:
-			print(d)
-			img.draw_rectangle(d.rect(), color=colors[i])
-			result = labels[i]
-			confidence = str(d[4]*100)
-	sendLINEphoto("Feed detection", img)
-	sendLINEmsg(confidence + "%" + " " + result)
+	for obj in net.classify(img, min_scale=1.0, scale_mul=0.8, x_overlap=0.5, y_overlap=0.5):
+		print("**********\nPredictions at [x=%d,y=%d,w=%d,h=%d]" % obj.rect())
+		img.draw_rectangle(obj.rect())
+		predictions_list = list(zip(labels, obj.output()))
+		for i in range(len(predictions_list)):
+			print("%s = %f" % (predictions_list[i][0], predictions_list[i][1]))
+			result += (predictions_list[i][0]) + "->" + str(predictions_list[i][1]*100) + "%" + "\n"
+	sendLINEphoto(result, img)
 try:
 	print("Reading file")
 	f = open("camInfo.txt", "r")
@@ -263,21 +262,17 @@ else:
 	f.write("cam:no-setting-is-available")
 	f.close()
 	machine.reset()
-net = tf.load('trained.tflite', load_to_fb=True)
-labels = []
+net = None
+labels = None
+try:
+	net = tf.load("trained.tflite", load_to_fb=uos.stat('trained.tflite')[6] > (gc.mem_free() - (64*1024)))
+except Exception as e:
+	print(e)
+	raise Exception('Failed to load "trained.tflite", did you copy the .tflite and labels.txt file onto the mass-storage device? (' + str(e) + ')')
 try:
 	labels = [line.rstrip('\n') for line in open("labels.txt")]
-except:
-	pass
-colors = [
-	(255,   0,   0),
-	(  0, 255,   0),
-	(255, 255,   0),
-	(  0,   0, 255),
-	(255,   0, 255),
-	(  0, 255, 255),
-	(255, 255, 255),
-]
+except Exception as e:
+	raise Exception('Failed to load "labels.txt", did you copy the .tflite and labels.txt file onto the mass-storage device? (' + str(e) + ')')
 while True:
 	try:
 		while (wlan.isconnected() == True):
