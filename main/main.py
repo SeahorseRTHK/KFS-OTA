@@ -1,5 +1,5 @@
 Version = "v1.9"
-import os, network, usocket, ussl, sensor, image, machine, time, gc, micropython, tf, senko
+import os, uos, network, usocket, ussl, sensor, image, machine, time, gc, micropython, tf, senko
 from mqtt import MQTTClient
 GithubURL = "https://github.com/SeahorseRTHK/KFS-OTA/blob/main/main/"
 OTA = senko.Senko(user="SeahorseRTHK", repo="KFS-OTA", working_dir="main", files=["main.py"])
