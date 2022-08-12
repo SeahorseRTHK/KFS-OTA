@@ -199,7 +199,7 @@ def detectFeed():
 			print(d)
 			img.draw_rectangle(d.rect(), color=colors[i])
 			result = labels[i]
-			confidence = d[4]*100
+			confidence = str(d[4]*100)
 	sendLINEphoto("Feed detection", img)
 	sendLINEmsg(confidence + "%" + " " + result)
 try:
