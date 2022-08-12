@@ -1,8 +1,8 @@
-Version = "v1.8"
+Version = "v1.9"
 import os, network, usocket, ussl, sensor, image, machine, time, gc, micropython, tf, senko
 from mqtt import MQTTClient
 GithubURL = "https://github.com/SeahorseRTHK/KFS-OTA/blob/main/main/"
-OTA = senko.Senko(user="SeahorseRTHK", repo="KFS-OTA", working_dir="main", files=["main.py","labels.txt","trained.tflite"])
+OTA = senko.Senko(user="SeahorseRTHK", repo="KFS-OTA", working_dir="main", files=["main.py"])
 sensor.reset()
 sensor.set_pixformat(sensor.RGB565)
 sensor.set_framesize(sensor.UXGA)
@@ -198,7 +198,10 @@ def detectFeed():
 		for d in detection_list:
 			print(d)
 			img.draw_rectangle(d.rect(), color=colors[i])
+			result = labels[i]
+			confidence = d[4]*100
 	sendLINEphoto("Feed detection", img)
+	sendLINEmsg(confidence + "%" + " " + result)
 try:
 	print("Reading file")
 	f = open("camInfo.txt", "r")
