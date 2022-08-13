@@ -1,4 +1,4 @@
-Version = "v1.9"
+Version = "v1.10"
 import os, uos, network, usocket, ussl, sensor, image, machine, time, gc, micropython, tf, senko
 from mqtt import MQTTClient
 GithubURL = "https://github.com/SeahorseRTHK/KFS-OTA/blob/main/main/"
@@ -99,8 +99,17 @@ def callback(topic, msg):
 	elif msg == b'detectfeed':
 		print("Detecting feed")
 		detectFeed()
+	elif msg == b'collectdata':
+		count = 1
+		while count <= 50:
+			sendLINEmsg("Taking a picture in 5 seconds")
+			time.sleep_ms(5000)
+			message = "Photo no." + str(count)
+			sendLINEphoto(message, None)
+			time.sleep_ms(67000)
+			count = count + 1
 	elif msg == b'help':
-		message = "commands:\ndetails\ngrayscale\nrgb565\nlineimage OR linephoto\nmqttimage OR mqttphoto\ndetectfeed\nupdate\nrestart\nhelp"
+		message = "commands:\ndetails\ngrayscale\nrgb565\nlineimage OR linephoto\nmqttimage OR mqttphoto\ndetectfeed\ncollectdata\nupdate\nrestart\nhelp"
 		sendLINEmsg(message)
 	else:
 		message = "Received invalid command: " + msg.decode('UTF-8') + ". Send command help to get help"
