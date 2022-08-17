@@ -1,2 +1,2 @@
-empty
-feed
+Tray is empty
+Tray with feed
