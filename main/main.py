@@ -199,7 +199,7 @@ def sendLINEphoto(msg,img):
 	print("")
 	LINE_Notify.close()
 def detectFeed():
-	result = "Classes:\n"
+	result = "\nSmartCam:\n"
 	sensor.set_framesize(sensor.UXGA)
 	img = sensor.snapshot()
 	for obj in net.classify(img, min_scale=1.0, scale_mul=0.8, x_overlap=0.5, y_overlap=0.5):
@@ -208,7 +208,8 @@ def detectFeed():
 		predictions_list = list(zip(labels, obj.output()))
 		for i in range(len(predictions_list)):
 			print("%s = %f" % (predictions_list[i][0], predictions_list[i][1]))
-			result += (predictions_list[i][0]) + "->" + str(predictions_list[i][1]*100) + "%" + "\n"
+			if predictions_list[i][1]*100 >= 50.0001:
+				result += (predictions_list[i][0])
 	sendLINEphoto(result, img)
 try:
 	print("Reading file")
