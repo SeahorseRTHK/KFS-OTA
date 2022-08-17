@@ -1,4 +1,4 @@
-Version = "v1.10"
+Version = "v1.11"
 import os, uos, network, usocket, ussl, sensor, image, machine, time, gc, micropython, tf, senko
 from mqtt import MQTTClient
 GithubURL = "https://github.com/SeahorseRTHK/KFS-OTA/blob/main/main/"
