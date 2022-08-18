@@ -1,4 +1,4 @@
-Version = "v1.12"
+Version = "v1.10"
 import os, uos, network, usocket, ussl, sensor, image, machine, time, gc, micropython, tf, senko
 from mqtt import MQTTClient
 GithubURL = "https://github.com/SeahorseRTHK/KFS-OTA/blob/main/main/"
@@ -10,8 +10,8 @@ sensor.skip_frames(time = 2000)
 PORT = 443
 HOST = "notify-api.line.me"
 token = "MPkSNSnyyyxkeUqaGrcHZxtG6LNTj5vazBJmhtYshew"
-SSID="SEAHORSE@unifi"
-KEY="SH42827AU"
+SSID="Seahorse"
+KEY="789456123"
 print("Trying to connect... (may take a while)...")
 wlan = network.WINC()
 try:
@@ -210,7 +210,9 @@ def detectFeed():
 			print("%s = %f" % (predictions_list[i][0], predictions_list[i][1]))
 			if predictions_list[i][1]*100 >= 50.0001:
 				result += (predictions_list[i][0])
+				result2 = (predictions_list[i][0])
 	sendLINEphoto(result, img)
+	MQTT.publish("86Box/Photo", result2)
 try:
 	print("Reading file")
 	f = open("camInfo.txt", "r")
