@@ -96,6 +96,7 @@ def callback(topic, msg):
 	elif msg == b'restart':
 		print("Restarting")
 		sendLINEmsg("Command received, restarting")
+		machine.reset()
 	elif msg == b'detectfeed':
 		print("Detecting feed")
 		detectFeed()
