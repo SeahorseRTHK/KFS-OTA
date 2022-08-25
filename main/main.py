@@ -1,4 +1,4 @@
-Version = "v1.13"
+Version = "v1.15"
 import os, uos, network, usocket, ussl, sensor, image, machine, time, gc, micropython, tf, senko
 from mqtt import MQTTClient
 GithubURL = "https://github.com/SeahorseRTHK/KFS-OTA/blob/main/main/"
@@ -9,7 +9,10 @@ sensor.set_framesize(sensor.UXGA)
 sensor.skip_frames(time = 2000)
 PORT = 443
 HOST = "notify-api.line.me"
-token = "MPkSNSnyyyxkeUqaGrcHZxtG6LNTj5vazBJmhtYshew"
+personalToken = "qBx4XoGPSJU9zxy3tYLBnbt31AFVVGXD35GC6nlJr28"
+seahorseToken = "MPkSNSnyyyxkeUqaGrcHZxtG6LNTj5vazBJmhtYshew"
+kfsToken = "RVfLyu9vCUrmT2NZ8DWxQkOYT8PpIJu8sKGKKx2ASW4"
+token = kfsToken
 SSID="Seahorse"
 KEY="789456123"
 print("Trying to connect... (may take a while)...")
@@ -39,7 +42,7 @@ except OSError:
 		machine.reset()
 except:
 	machine.reset()
-mainTopic = "OpenMV"
+mainTopic = "CAM-KFS-Demo"
 MQTT = MQTTClient(mainTopic, "honwis.dyndns.biz", port=1883, keepalive=65500)
 try:
 	print("Connecting to MQTT server")
@@ -58,8 +61,14 @@ except:
 	machine.reset()
 def callback(topic, msg):
 	print(topic, msg)
-	if msg == b'details':
+	if msg == b'photo':
+		token = kfsToken
+		message = "OpenMV-CAM " + Version + ", photo"
+		sendLINEphoto(message, None)
+	elif msg == b'details':
+		token = seahorseToken
 		f = open("camInfo.txt", "r")
+		temp = f.read(4)
 		info = f.read()
 		f.close()
 		message = info + "-" + Version + ". IP: " + wlan.ifconfig()[0] + ". RSSI: " + str(wlan.rssi())
@@ -69,10 +78,12 @@ def callback(topic, msg):
 		message = "Camera set to grayscale"
 		sendLINEmsg(message)
 	elif msg == b'rgb565':
+		token = seahorseToken
 		sensor.set_pixformat(sensor.RGB565)
 		message = "Camera set to RGB565"
 		sendLINEmsg(message)
 	elif msg == b'lineimage' or msg == b'linephoto':
+		token = seahorseToken
 		message = "OpenMV-CAM " + Version + ", photo"
 		sendLINEphoto(message, None)
 	elif msg == b'mqttimage' or msg == b'mqttphoto':
@@ -83,6 +94,7 @@ def callback(topic, msg):
 		MQTT.publish("86Box/Photo", img)
 		del img
 	elif msg == b'update':
+		token = seahorseToken
 		print("Updating")
 		sendLINEmsg("Attempting update")
 		try:
@@ -94,6 +106,7 @@ def callback(topic, msg):
 			sendLINEmsg("Failed to update")
 			print("Not updated!")
 	elif msg == b'restart':
+		token = seahorseToken
 		print("Restarting")
 		sendLINEmsg("Command received, restarting")
 		machine.reset()
@@ -101,6 +114,7 @@ def callback(topic, msg):
 		print("Detecting feed")
 		detectFeed()
 	elif msg == b'collectdata':
+		token = seahorseToken
 		count = 1
 		while count <= 50:
 			sendLINEmsg("Taking a picture in 5 seconds")
@@ -110,17 +124,16 @@ def callback(topic, msg):
 			time.sleep_ms(67000)
 			count = count + 1
 	elif msg == b'help':
+		token = seahorseToken
 		message = "commands:\ndetails\ngrayscale\nrgb565\nlineimage OR linephoto\nmqttimage OR mqttphoto\ndetectfeed\ncollectdata\nupdate\nrestart\nhelp"
 		sendLINEmsg(message)
 	else:
+		token = seahorseToken
 		message = "Received invalid command: " + msg.decode('UTF-8') + ". Send command help to get help"
 		sendLINEmsg(message)
 MQTT.set_callback(callback)
-MQTT.subscribe(mainTopic + "/command")
+MQTT.subscribe(mainTopic)
 MQTT.set_last_will(mainTopic, "OFFLINE")
-def sendMQTT(subTopic, msg):
-	subTopic = mainTopic + "/" + subTopic
-	MQTT.publish(subTopic, msg)
 def sendLINEmsg(msg):
 	LINE_Notify = usocket.socket(usocket.AF_INET, usocket.SOCK_STREAM)
 	LINE_Notify.connect(addr)
@@ -214,9 +227,11 @@ def detectFeed():
 				result2 = (predictions_list[i][0])
 	sendLINEphoto(result, img)
 	MQTT.publish("86Box/Photo", result2)
+	MQTT.publish("86Box/Photo/Raw", img.compress(quality=95))
 try:
 	print("Reading file")
 	f = open("camInfo.txt", "r")
+	temp = f.read(4)
 	message = f.read()
 	f.close()
 	print("message is " + message)
@@ -228,7 +243,6 @@ except OSError:
 	print("Created new camInfo.txt file with cam:no-setting-is-available")
 	f.close()
 finally:
-	MQTT.publish(mainTopic, message + "-" + Version + " is online")
 	sendLINEmsg(message + "-" + Version + " is online")
 	time.sleep_ms(500)
 f = open("camInfo.txt", "r")
