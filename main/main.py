@@ -1,6 +1,8 @@
-Version = "v1.15"
-import os, uos, network, usocket, ussl, sensor, image, machine, time, gc, micropython, tf, senko
+Version = "v1.16"
+import os, uos, network, usocket, ussl, sensor, image, machine, time, utime, gc, micropython, pyb, tf, senko, urequests
 from mqtt import MQTTClient
+from machine import RTC
+import ntptime
 GithubURL = "https://github.com/SeahorseRTHK/KFS-OTA/blob/main/main/"
 OTA = senko.Senko(user="SeahorseRTHK", repo="KFS-OTA", working_dir="main", files=["main.py","labels.txt"])
 sensor.reset()
@@ -9,12 +11,9 @@ sensor.set_framesize(sensor.UXGA)
 sensor.skip_frames(time = 2000)
 PORT = 443
 HOST = "notify-api.line.me"
-personalToken = "qBx4XoGPSJU9zxy3tYLBnbt31AFVVGXD35GC6nlJr28"
-seahorseToken = "MPkSNSnyyyxkeUqaGrcHZxtG6LNTj5vazBJmhtYshew"
-kfsToken = "RVfLyu9vCUrmT2NZ8DWxQkOYT8PpIJu8sKGKKx2ASW4"
-token = kfsToken
-SSID="Seahorse"
-KEY="789456123"
+token = "RVfLyu9vCUrmT2NZ8DWxQkOYT8PpIJu8sKGKKx2ASW4"
+SSID="KFS"
+KEY="kfs123456"
 print("Trying to connect... (may take a while)...")
 wlan = network.WINC()
 try:
@@ -43,7 +42,7 @@ except OSError:
 except:
 	machine.reset()
 mainTopic = "CAM-KFS-Demo"
-MQTT = MQTTClient(mainTopic, "honwis.dyndns.biz", port=1883, keepalive=65500)
+MQTT = MQTTClient(mainTopic, "vps.seahorse.asia", port=1883, keepalive=65500)
 try:
 	print("Connecting to MQTT server")
 	MQTT.connect()
@@ -62,11 +61,9 @@ except:
 def callback(topic, msg):
 	print(topic, msg)
 	if msg == b'photo':
-		token = kfsToken
 		message = "OpenMV-CAM " + Version + ", photo"
 		sendLINEphoto(message, None)
 	elif msg == b'details':
-		token = seahorseToken
 		f = open("camInfo.txt", "r")
 		temp = f.read(4)
 		info = f.read()
@@ -78,12 +75,10 @@ def callback(topic, msg):
 		message = "Camera set to grayscale"
 		sendLINEmsg(message)
 	elif msg == b'rgb565':
-		token = seahorseToken
 		sensor.set_pixformat(sensor.RGB565)
 		message = "Camera set to RGB565"
 		sendLINEmsg(message)
 	elif msg == b'lineimage' or msg == b'linephoto':
-		token = seahorseToken
 		message = "OpenMV-CAM " + Version + ", photo"
 		sendLINEphoto(message, None)
 	elif msg == b'mqttimage' or msg == b'mqttphoto':
@@ -94,7 +89,6 @@ def callback(topic, msg):
 		MQTT.publish("86Box/Photo", img)
 		del img
 	elif msg == b'update':
-		token = seahorseToken
 		print("Updating")
 		sendLINEmsg("Attempting update")
 		try:
@@ -106,7 +100,6 @@ def callback(topic, msg):
 			sendLINEmsg("Failed to update")
 			print("Not updated!")
 	elif msg == b'restart':
-		token = seahorseToken
 		print("Restarting")
 		sendLINEmsg("Command received, restarting")
 		machine.reset()
@@ -114,7 +107,6 @@ def callback(topic, msg):
 		print("Detecting feed")
 		detectFeed()
 	elif msg == b'collectdata':
-		token = seahorseToken
 		count = 1
 		while count <= 50:
 			sendLINEmsg("Taking a picture in 5 seconds")
@@ -124,11 +116,9 @@ def callback(topic, msg):
 			time.sleep_ms(67000)
 			count = count + 1
 	elif msg == b'help':
-		token = seahorseToken
 		message = "commands:\ndetails\ngrayscale\nrgb565\nlineimage OR linephoto\nmqttimage OR mqttphoto\ndetectfeed\ncollectdata\nupdate\nrestart\nhelp"
 		sendLINEmsg(message)
 	else:
-		token = seahorseToken
 		message = "Received invalid command: " + msg.decode('UTF-8') + ". Send command help to get help"
 		sendLINEmsg(message)
 MQTT.set_callback(callback)
@@ -225,9 +215,9 @@ def detectFeed():
 			if predictions_list[i][1]*100 >= 50.0001:
 				result += (predictions_list[i][0])
 				result2 = (predictions_list[i][0])
-	sendLINEphoto(result, img)
+	sendLINEphoto(result2, img)
 	MQTT.publish("86Box/Photo", result2)
-	MQTT.publish("86Box/Photo/Raw", img.compress(quality=95))
+	MQTT.publish("86Box/Photo/Raw", img.compress(quality=80))
 try:
 	print("Reading file")
 	f = open("camInfo.txt", "r")
@@ -243,6 +233,7 @@ except OSError:
 	print("Created new camInfo.txt file with cam:no-setting-is-available")
 	f.close()
 finally:
+	MQTT.publish(mainTopic, "details")
 	sendLINEmsg(message + "-" + Version + " is online")
 	time.sleep_ms(500)
 f = open("camInfo.txt", "r")
@@ -300,57 +291,16 @@ try:
 	labels = [line.rstrip('\n') for line in open("labels.txt")]
 except Exception as e:
 	raise Exception('Failed to load "labels.txt", did you copy the .tflite and labels.txt file onto the mass-storage device? (' + str(e) + ')')
+start = pyb.millis()
 while True:
-	try:
-		while (wlan.isconnected() == True):
-			print("waiting")
-			MQTT.wait_msg()
-	except:
-		time.sleep_ms(2000)
-		if (wlan.isconnected() == False):
-			print("WiFi not connected, retrying in 5 seconds")
-			time.sleep_ms(5000)
-			print("Trying to connect now")
+	if (wlan.isconnected() == True):
+		if pyb.elapsed_millis(start) == 1500:
 			try:
-				wlan.connect(SSID, key=KEY, security=wlan.WPA_PSK)
-				print(wlan.ifconfig())
-			except OSError:
-				try:
-					print("Failed to connect to WiFi, trying again after 5 seconds")
-					time.sleep_ms(5000)
-					wlan.connect(SSID, key=KEY, security=wlan.WPA_PSK)
-					print(wlan.ifconfig())
-				except:
-					machine.reset()
+				print("waiting")
+				MQTT.check_msg()
+				start = pyb.millis()
 			except:
-				print("Failed again, restarting")
-				machine.reset()
-			try:
-				addr = usocket.getaddrinfo(HOST, PORT)[0][-1]
-				print(addr)
-			except OSError:
-				try:
-					addr = usocket.getaddrinfo(HOST, PORT)[0][-1]
-					print(addr)
-				except:
-					machine.reset()
-			except:
-				machine.reset()
-			try:
-				print("Connecting to MQTT server")
-				MQTT.connect()
-				print("Connected to MQTT server")
-			except OSError:
-				try:
-					print("Failed to connect to MQTT server, trying again after 3 seconds")
-					time.sleep_ms(3000)
-					MQTT.connect()
-					print("Connected to MQTT server")
-				except:
-					machine.reset()
-			except:
-				print("doing machine reset")
-				machine.reset()
-		else:
-			print("Unknown error, restarting")
-			machine.reset()
+				print("No message")
+				start = pyb.millis()
+	else:
+		machine.reset()
