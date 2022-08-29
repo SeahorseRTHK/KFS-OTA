@@ -1,17 +1,15 @@
-Version = "v1.16"
+Version = "v1.17"
 import os, uos, network, usocket, ussl, sensor, image, machine, time, utime, gc, micropython, pyb, tf, senko, urequests
 from mqtt import MQTTClient
-from machine import RTC
-import ntptime
 GithubURL = "https://github.com/SeahorseRTHK/KFS-OTA/blob/main/main/"
-OTA = senko.Senko(user="SeahorseRTHK", repo="KFS-OTA", working_dir="main", files=["main.py","labels.txt"])
+OTA = senko.Senko(user="SeahorseRTHK", repo="KFS-OTA", working_dir="main", files=["main.py"])
 sensor.reset()
 sensor.set_pixformat(sensor.RGB565)
 sensor.set_framesize(sensor.UXGA)
 sensor.skip_frames(time = 2000)
 PORT = 443
 HOST = "notify-api.line.me"
-token = "RVfLyu9vCUrmT2NZ8DWxQkOYT8PpIJu8sKGKKx2ASW4"
+token = "MPkSNSnyyyxkeUqaGrcHZxtG6LNTj5vazBJmhtYshew"
 SSID="KFS"
 KEY="kfs123456"
 print("Trying to connect... (may take a while)...")
@@ -42,7 +40,7 @@ except OSError:
 except:
 	machine.reset()
 mainTopic = "CAM-KFS-Demo"
-MQTT = MQTTClient(mainTopic, "vps.seahorse.asia", port=1883, keepalive=65500)
+MQTT = MQTTClient(mainTopic, "vps.seahorse.asia", port=1883, keepalive=10)
 try:
 	print("Connecting to MQTT server")
 	MQTT.connect()
@@ -61,7 +59,7 @@ except:
 def callback(topic, msg):
 	print(topic, msg)
 	if msg == b'photo':
-		message = "OpenMV-CAM " + Version + ", photo"
+		message = "CAM-KFS-Demo " + Version + ", photo"
 		sendLINEphoto(message, None)
 	elif msg == b'details':
 		f = open("camInfo.txt", "r")
@@ -79,7 +77,7 @@ def callback(topic, msg):
 		message = "Camera set to RGB565"
 		sendLINEmsg(message)
 	elif msg == b'lineimage' or msg == b'linephoto':
-		message = "OpenMV-CAM " + Version + ", photo"
+		message = "CAM-KFS-Demo " + Version + ", photo"
 		sendLINEphoto(message, None)
 	elif msg == b'mqttimage' or msg == b'mqttphoto':
 		sensor.set_framesize(sensor.QVGA)
@@ -123,7 +121,7 @@ def callback(topic, msg):
 		sendLINEmsg(message)
 MQTT.set_callback(callback)
 MQTT.subscribe(mainTopic)
-MQTT.set_last_will(mainTopic, "OFFLINE")
+MQTT.set_last_will(mainTopic + "/state", "OFFLINE")
 def sendLINEmsg(msg):
 	LINE_Notify = usocket.socket(usocket.AF_INET, usocket.SOCK_STREAM)
 	LINE_Notify.connect(addr)
@@ -141,7 +139,7 @@ def sendLINEmsg(msg):
 	request += "cache-control: no-cache\r\n"
 	request += "Authorization: Bearer " + token + "\r\n"
 	request += "Content-Type: multipart/form-data; boundary=Taiwan\r\n"
-	request += "User-Agent: OpenMV\r\n"
+	request += "User-Agent: CAM-KFS\r\n"
 	request += "Accept: */*\r\n"
 	request += "HOST: " + HOST + "\r\n"
 	request += "accept-encoding: gzip, deflate\r\n"
@@ -160,7 +158,7 @@ def sendLINEphoto(msg,img):
 	LINE_Notify.settimeout(5.0)
 	LINE_Notify = ussl.wrap_socket(LINE_Notify, server_hostname=HOST)
 	if msg is None:
-		message = "OpenMV-CAM"
+		message = "CAM-KFS-Demo"
 	else:
 		message = msg
 	if img is None:
@@ -169,7 +167,7 @@ def sendLINEphoto(msg,img):
 		img = sensor.snapshot().compress(quality=95)
 	else:
 		img = img.compress(quality=95)
-	head = "--Taiwan\r\nContent-Disposition: form-data; name=\"message\"; \r\n\r\n" + message + "\r\n--Taiwan\r\nContent-Disposition: form-data; name=\"imageFile\"; filename=\"OpenMV-CAM.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n"
+	head = "--Taiwan\r\nContent-Disposition: form-data; name=\"message\"; \r\n\r\n" + message + "\r\n--Taiwan\r\nContent-Disposition: form-data; name=\"imageFile\"; filename=\"CAM-KFS-Demo.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n"
 	tail = "\r\n--Taiwan--\r\n"
 	totalLen = str(len(head) + len(tail) + len(img.bytearray()))
 	print("totalLen is " + totalLen)
@@ -177,7 +175,7 @@ def sendLINEphoto(msg,img):
 	request += "cache-control: no-cache\r\n"
 	request += "Authorization: Bearer " + token + "\r\n"
 	request += "Content-Type: multipart/form-data; boundary=Taiwan\r\n"
-	request += "User-Agent: OpenMV\r\n"
+	request += "User-Agent: CAM-KFS\r\n"
 	request += "Accept: */*\r\n"
 	request += "HOST: " + HOST + "\r\n"
 	request += "accept-encoding: gzip, deflate\r\n"
@@ -218,6 +216,8 @@ def detectFeed():
 	sendLINEphoto(result2, img)
 	MQTT.publish("86Box/Photo", result2)
 	MQTT.publish("86Box/Photo/Raw", img.compress(quality=80))
+	del img
+	gc.collect()
 try:
 	print("Reading file")
 	f = open("camInfo.txt", "r")
@@ -233,7 +233,7 @@ except OSError:
 	print("Created new camInfo.txt file with cam:no-setting-is-available")
 	f.close()
 finally:
-	MQTT.publish(mainTopic, "details")
+	MQTT.publish(mainTopic + "/state", "ONLINE")
 	sendLINEmsg(message + "-" + Version + " is online")
 	time.sleep_ms(500)
 f = open("camInfo.txt", "r")
@@ -302,5 +302,9 @@ while True:
 			except:
 				print("No message")
 				start = pyb.millis()
+				try:
+					MQTT.publish(mainTopic + "/state", "Waiting for command")
+				except:
+					machine.reset()
 	else:
 		machine.reset()
