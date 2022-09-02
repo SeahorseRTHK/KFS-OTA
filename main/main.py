@@ -1,8 +1,8 @@
-Version = "v1.17"
+Version = "v1.18"
 import os, uos, network, usocket, ussl, sensor, image, machine, time, utime, gc, micropython, pyb, tf, senko, urequests
 from mqtt import MQTTClient
 GithubURL = "https://github.com/SeahorseRTHK/KFS-OTA/blob/main/main/"
-OTA = senko.Senko(user="SeahorseRTHK", repo="KFS-OTA", working_dir="main", files=["main.py"])
+OTA = senko.Senko(user="SeahorseRTHK", repo="KFS-OTA", working_dir="main", files=["update.py"])
 sensor.reset()
 sensor.set_pixformat(sensor.RGB565)
 sensor.set_framesize(sensor.UXGA)
@@ -12,6 +12,7 @@ HOST = "notify-api.line.me"
 token = "RVfLyu9vCUrmT2NZ8DWxQkOYT8PpIJu8sKGKKx2ASW4"
 SSID="KFS"
 KEY="kfs123456"
+currentTime = "dd/mm//yy hh:mm"
 print("Trying to connect... (may take a while)...")
 wlan = network.WINC()
 try:
@@ -40,7 +41,7 @@ except OSError:
 except:
 	machine.reset()
 mainTopic = "CAM-KFS-Demo"
-MQTT = MQTTClient(mainTopic, "vps.seahorse.asia", port=1883, keepalive=10)
+MQTT = MQTTClient(mainTopic, "vps.seahorse.asia", port=1883, keepalive=65500)
 try:
 	print("Connecting to MQTT server")
 	MQTT.connect()
@@ -59,8 +60,17 @@ except:
 def callback(topic, msg):
 	print(topic, msg)
 	if msg == b'photo':
-		message = "CAM-KFS-Demo " + Version + ", photo"
-		sendLINEphoto(message, None)
+		message = mainTopic + " " + Version + ", photo"
+		sendLINEphoto(message, None, None)
+	elif b'photow,' in msg:
+		print("HELLO")
+		msg = msg.decode("utf-8")
+		text = msg.split(",",1)
+		print("text[0] is", (text[0]))
+		print("text[1] is", (text[1]))
+		message = mainTopic + " " + Version + ", photo " + text[1]
+		sendLINEphoto(message, None, text[1])
+		print("TEST")
 	elif msg == b'details':
 		f = open("camInfo.txt", "r")
 		temp = f.read(4)
@@ -77,8 +87,8 @@ def callback(topic, msg):
 		message = "Camera set to RGB565"
 		sendLINEmsg(message)
 	elif msg == b'lineimage' or msg == b'linephoto':
-		message = "CAM-KFS-Demo " + Version + ", photo"
-		sendLINEphoto(message, None)
+		message = mainTopic + " " + Version + ", photo"
+		sendLINEphoto(message, None, None)
 	elif msg == b'mqttimage' or msg == b'mqttphoto':
 		sensor.set_framesize(sensor.QVGA)
 		sensor.set_windowing(240,240)
@@ -91,8 +101,12 @@ def callback(topic, msg):
 		sendLINEmsg("Attempting update")
 		try:
 			if OTA.update():
-				sendLINEmsg("Update complete! Restarting")
-				print("Updated to the latest version! Rebooting...")
+				sendLINEmsg("Update complete! Arranging files")
+				print("Update complete! Arranging files")
+				os.rename("/main.py","/backup/backup.py")
+				os.rename("/update.py","/main.py")
+				print("Files arranged, restarting")
+				time.sleep_ms(1000)
 				machine.reset()
 		except:
 			sendLINEmsg("Failed to update")
@@ -110,11 +124,11 @@ def callback(topic, msg):
 			sendLINEmsg("Taking a picture in 5 seconds")
 			time.sleep_ms(5000)
 			message = "Photo no." + str(count)
-			sendLINEphoto(message, None)
+			sendLINEphoto(message, None, None)
 			time.sleep_ms(67000)
 			count = count + 1
 	elif msg == b'help':
-		message = "commands:\ndetails\ngrayscale\nrgb565\nlineimage OR linephoto\nmqttimage OR mqttphoto\ndetectfeed\ncollectdata\nupdate\nrestart\nhelp"
+		message = "commands:\ndetails\ngrayscale\nrgb565\nlineimage OR linephoto OR photo\nmqttimage OR mqttphoto\ndetectfeed\ncollectdata\nupdate\nrestart\nhelp"
 		sendLINEmsg(message)
 	else:
 		message = "Received invalid command: " + msg.decode('UTF-8') + ". Send command help to get help"
@@ -152,7 +166,7 @@ def sendLINEmsg(msg):
 	print(LINE_Notify.read())
 	gc.collect()
 	LINE_Notify.close()
-def sendLINEphoto(msg,img):
+def sendLINEphoto(msg,img,text):
 	LINE_Notify = usocket.socket(usocket.AF_INET, usocket.SOCK_STREAM)
 	LINE_Notify.connect(addr)
 	LINE_Notify.settimeout(5.0)
@@ -164,9 +178,28 @@ def sendLINEphoto(msg,img):
 	if img is None:
 		sensor.set_framesize(sensor.UXGA)
 		sensor.set_windowing(1600,1200)
-		img = sensor.snapshot().compress(quality=95)
+		img = sensor.snapshot()
+		if text is not None:
+			x = img.width() - 95
+			y = img.height() - 30
+			r = 255
+			g = 0
+			b = 0
+			img.draw_string(x, y, text, color = (r, g, b), scale = 10, mono_space = False,
+								char_rotation = 0, char_hmirror = False, char_vflip = False,
+								string_rotation = -90, string_hmirror = False, string_vflip = False)
+		img.compress(quality=95)
 	else:
-		img = img.compress(quality=95)
+		if text is not None:
+			x = img.width() - 95
+			y = img.height() - 30
+			r = 255
+			g = 0
+			b = 0
+			img.draw_string(x, y, text, color = (r, g, b), scale = 10, mono_space = False,
+								char_rotation = 0, char_hmirror = False, char_vflip = False,
+								string_rotation = -90, string_hmirror = False, string_vflip = False)
+		img.compress(quality=95)
 	head = "--Taiwan\r\nContent-Disposition: form-data; name=\"message\"; \r\n\r\n" + message + "\r\n--Taiwan\r\nContent-Disposition: form-data; name=\"imageFile\"; filename=\"CAM-KFS-Demo.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n"
 	tail = "\r\n--Taiwan--\r\n"
 	totalLen = str(len(head) + len(tail) + len(img.bytearray()))
@@ -213,7 +246,7 @@ def detectFeed():
 			if predictions_list[i][1]*100 >= 50.0001:
 				result += (predictions_list[i][0])
 				result2 = (predictions_list[i][0])
-	sendLINEphoto(result2, img)
+	sendLINEphoto(result2, img, result2)
 	MQTT.publish("86Box/Photo", result2)
 	MQTT.publish("86Box/Photo/Raw", img.compress(quality=80))
 	del img
@@ -234,7 +267,7 @@ except OSError:
 	f.close()
 finally:
 	MQTT.publish(mainTopic + "/state", "ONLINE")
-	sendLINEmsg(message + "-" + Version + " is online")
+	sendLINEmsg(mainTopic + "-" + Version + " is online" + ". IP: " + wlan.ifconfig()[0] + ". RSSI: " + str(wlan.rssi()))
 	time.sleep_ms(500)
 f = open("camInfo.txt", "r")
 temp = f.read(4)
@@ -282,6 +315,10 @@ else:
 	machine.reset()
 net = None
 labels = None
+try:
+	os.mkdir("/backup")
+except:
+	print("Already exist")
 try:
 	net = tf.load("trained.tflite", load_to_fb=uos.stat('trained.tflite')[6] > (gc.mem_free() - (64*1024)))
 except Exception as e:
