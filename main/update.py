@@ -1,7 +1,6 @@
-Version = "v1.18"
-import os, uos, network, usocket, ussl, sensor, image, machine, time, utime, gc, micropython, pyb, tf, senko, urequests
+Version = "v1.19"
+import os, uos, network, usocket, ussl, sensor, image, machine, time, gc, pyb, tf, senko, urequests
 from mqtt import MQTTClient
-GithubURL = "https://github.com/SeahorseRTHK/KFS-OTA/blob/main/main/"
 OTA = senko.Senko(user="SeahorseRTHK", repo="KFS-OTA", working_dir="main", files=["update.py"])
 sensor.reset()
 sensor.set_pixformat(sensor.RGB565)
@@ -40,7 +39,21 @@ except OSError:
 		machine.reset()
 except:
 	machine.reset()
-mainTopic = "CAM-KFS-Demo"
+try:
+	print("Reading file")
+	f = open("camInfo.txt", "r")
+	temp = f.read(4)
+	message = f.read()
+	f.close()
+	print("message is " + message)
+except OSError:
+	print("OSError 2 ENOENT = file/dir does not exist, creating file")
+	f = open("camInfo.txt", "w")
+	f.write("cam:no-setting-is-available")
+	message = "cam:no-setting-is-available"
+	print("Created new camInfo.txt file with cam:no-setting-is-available")
+	f.close()
+mainTopic = message
 MQTT = MQTTClient(mainTopic, "vps.seahorse.asia", port=1883, keepalive=65500)
 try:
 	print("Connecting to MQTT server")
@@ -63,14 +76,12 @@ def callback(topic, msg):
 		message = mainTopic + " " + Version + ", photo"
 		sendLINEphoto(message, None, None)
 	elif b'photow,' in msg:
-		print("HELLO")
 		msg = msg.decode("utf-8")
 		text = msg.split(",",1)
 		print("text[0] is", (text[0]))
 		print("text[1] is", (text[1]))
 		message = mainTopic + " " + Version + ", photo " + text[1]
 		sendLINEphoto(message, None, text[1])
-		print("TEST")
 	elif msg == b'details':
 		f = open("camInfo.txt", "r")
 		temp = f.read(4)
@@ -93,8 +104,7 @@ def callback(topic, msg):
 		sensor.set_framesize(sensor.QVGA)
 		sensor.set_windowing(240,240)
 		img = sensor.snapshot().compress(quality=75)
-		print(img)
-		MQTT.publish("86Box/Photo", img)
+		MQTT.publish(mainTopic+"/Photo", img)
 		del img
 	elif msg == b'update':
 		print("Updating")
@@ -113,6 +123,7 @@ def callback(topic, msg):
 			print("Not updated!")
 	elif msg == b'restart':
 		print("Restarting")
+		MQTT.publish(mainTopic + "/state", "Restarting")
 		sendLINEmsg("Command received, restarting")
 		machine.reset()
 	elif msg == b'detectfeed':
@@ -128,7 +139,7 @@ def callback(topic, msg):
 			time.sleep_ms(67000)
 			count = count + 1
 	elif msg == b'help':
-		message = "commands:\ndetails\ngrayscale\nrgb565\nlineimage OR linephoto OR photo\nmqttimage OR mqttphoto\ndetectfeed\ncollectdata\nupdate\nrestart\nhelp"
+		message = "commands:\ndetails\ngrayscale\nrgb565\nlineimage OR linephoto OR photo\nmqttimage OR mqttphoto\nphotow,(TEXT HERE)\ndetectfeed\ncollectdata\nupdate\nrestart\nhelp"
 		sendLINEmsg(message)
 	else:
 		message = "Received invalid command: " + msg.decode('UTF-8') + ". Send command help to get help"
@@ -142,18 +153,13 @@ def sendLINEmsg(msg):
 	LINE_Notify.settimeout(5.0)
 	LINE_Notify = ussl.wrap_socket(LINE_Notify, server_hostname=HOST)
 	head = "--Taiwan\r\nContent-Disposition: form-data; name=\"message\"; \r\n\r\n" + msg
-	print("len of head is " + str(len(head)))
 	tail = "\r\n--Taiwan--\r\n"
-	print("len of tail is " + str(len(tail)))
 	totalLen = str(len(head) + len(tail))
-	print("totalLen is " + totalLen)
-	print("head is " + head)
-	print("tail is " + tail)
 	request = "POST /api/notify HTTP/1.1\r\n"
 	request += "cache-control: no-cache\r\n"
 	request += "Authorization: Bearer " + token + "\r\n"
 	request += "Content-Type: multipart/form-data; boundary=Taiwan\r\n"
-	request += "User-Agent: CAM-KFS\r\n"
+	request += "User-Agent: KFS\r\n"
 	request += "Accept: */*\r\n"
 	request += "HOST: " + HOST + "\r\n"
 	request += "accept-encoding: gzip, deflate\r\n"
@@ -172,7 +178,7 @@ def sendLINEphoto(msg,img,text):
 	LINE_Notify.settimeout(5.0)
 	LINE_Notify = ussl.wrap_socket(LINE_Notify, server_hostname=HOST)
 	if msg is None:
-		message = "CAM-KFS-Demo"
+		message = mainTopic
 	else:
 		message = msg
 	if img is None:
@@ -200,7 +206,7 @@ def sendLINEphoto(msg,img,text):
 								char_rotation = 0, char_hmirror = False, char_vflip = False,
 								string_rotation = -90, string_hmirror = False, string_vflip = False)
 		img.compress(quality=95)
-	head = "--Taiwan\r\nContent-Disposition: form-data; name=\"message\"; \r\n\r\n" + message + "\r\n--Taiwan\r\nContent-Disposition: form-data; name=\"imageFile\"; filename=\"CAM-KFS-Demo.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n"
+	head = "--Taiwan\r\nContent-Disposition: form-data; name=\"message\"; \r\n\r\n" + message + "\r\n--Taiwan\r\nContent-Disposition: form-data; name=\"imageFile\"; filename=\"" + mainTopic + ".jpg\"\r\nContent-Type: image/jpeg\r\n\r\n"
 	tail = "\r\n--Taiwan--\r\n"
 	totalLen = str(len(head) + len(tail) + len(img.bytearray()))
 	print("totalLen is " + totalLen)
@@ -208,22 +214,13 @@ def sendLINEphoto(msg,img,text):
 	request += "cache-control: no-cache\r\n"
 	request += "Authorization: Bearer " + token + "\r\n"
 	request += "Content-Type: multipart/form-data; boundary=Taiwan\r\n"
-	request += "User-Agent: CAM-KFS\r\n"
+	request += "User-Agent: KFS\r\n"
 	request += "Accept: */*\r\n"
 	request += "HOST: " + HOST + "\r\n"
 	request += "accept-encoding: gzip, deflate\r\n"
 	request += "Connection: close\r\n"
 	request += "Content-Length: " + totalLen + "\r\n"
 	request += "\r\n"
-	print("")
-	print("headers are ")
-	print("")
-	print(request)
-	print("")
-	print("body is ")
-	print(head)
-	print(tail)
-	print("")
 	LINE_Notify.write(request)
 	LINE_Notify.write(head)
 	LINE_Notify.write(img.bytearray())
@@ -234,7 +231,6 @@ def sendLINEphoto(msg,img,text):
 	print("")
 	LINE_Notify.close()
 def detectFeed():
-	result = "\nSmartCam:\n"
 	sensor.set_framesize(sensor.UXGA)
 	img = sensor.snapshot()
 	for obj in net.classify(img, min_scale=1.0, scale_mul=0.8, x_overlap=0.5, y_overlap=0.5):
@@ -244,31 +240,14 @@ def detectFeed():
 		for i in range(len(predictions_list)):
 			print("%s = %f" % (predictions_list[i][0], predictions_list[i][1]))
 			if predictions_list[i][1]*100 >= 50.0001:
-				result += (predictions_list[i][0])
 				result2 = (predictions_list[i][0])
 	sendLINEphoto(result2, img, result2)
-	MQTT.publish("86Box/Photo", result2)
-	MQTT.publish("86Box/Photo/Raw", img.compress(quality=80))
-	del img
+	MQTT.publish(mainTopic+"/AI", result2)
+	MQTT.publish(mainTopic+"/AI/Photo", img.compress(quality=80))
 	gc.collect()
-try:
-	print("Reading file")
-	f = open("camInfo.txt", "r")
-	temp = f.read(4)
-	message = f.read()
-	f.close()
-	print("message is " + message)
-except OSError:
-	print("OSError 2 ENOENT = file/dir does not exist, creating file")
-	f = open("camInfo.txt", "w")
-	f.write("cam:no-setting-is-available")
-	message = "cam:no-setting-is-available"
-	print("Created new camInfo.txt file with cam:no-setting-is-available")
-	f.close()
-finally:
-	MQTT.publish(mainTopic + "/state", "ONLINE")
-	sendLINEmsg(mainTopic + "-" + Version + " is online" + ". IP: " + wlan.ifconfig()[0] + ". RSSI: " + str(wlan.rssi()))
-	time.sleep_ms(500)
+MQTT.publish(mainTopic + "/state", "ONLINE")
+sendLINEmsg(mainTopic + "-" + Version + " is online" + ". IP: " + wlan.ifconfig()[0] + ". RSSI: " + str(wlan.rssi()))
+time.sleep_ms(500)
 f = open("camInfo.txt", "r")
 temp = f.read(4)
 message = f.read()
