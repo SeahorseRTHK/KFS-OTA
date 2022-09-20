@@ -8,9 +8,9 @@ sensor.set_framesize(sensor.UXGA)
 sensor.skip_frames(time = 2000)
 PORT = 443
 HOST = "notify-api.line.me"
-token = "MPkSNSnyyyxkeUqaGrcHZxtG6LNTj5vazBJmhtYshew"
-SSID="Seahorse"
-KEY="789456123"
+token = "RVfLyu9vCUrmT2NZ8DWxQkOYT8PpIJu8sKGKKx2ASW4"
+SSID="KFS"
+KEY="kfs123456"
 currentTime = "dd/mm//yy hh:mm"
 print("Trying to connect... (may take a while)...")
 wlan = network.WINC()
@@ -242,7 +242,7 @@ def detectFeed():
 	sensor.set_framesize(sensor.UXGA)
 	img = sensor.snapshot()
 	sendLINEphoto("Detecting feed:", img, None)
-	MQTT.publish("86Box/Photo/Raw", img.compress(quality=90))
+	MQTT.publish(mainTopic+"/AI/Photo", img.compress(quality=90))
 	gc.collect()
 MQTT.publish(mainTopic + "/state", "ONLINE")
 sendLINEmsg(mainTopic + " " + Version + " is online" + ". IP: " + wlan.ifconfig()[0] + ". RSSI: " + str(wlan.rssi()))
