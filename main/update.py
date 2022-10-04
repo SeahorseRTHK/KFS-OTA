@@ -1,4 +1,4 @@
-Version = "Cam-v1.20"
+Version = "v1.20"
 import os, uos, network, usocket, ussl, sensor, image, machine, time, gc, pyb, tf, senko, urequests
 from mqtt import MQTTClient
 OTA = senko.Senko(user="SeahorseRTHK", repo="KFS-OTA", working_dir="main", files=["update.py"])
