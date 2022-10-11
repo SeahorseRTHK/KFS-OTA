@@ -74,14 +74,14 @@ def callback(topic, msg):
 	print(topic, msg)
 	if msg == b'photo':
 		message = mainTopic + " " + Version + ", photo"
-		sendLINEphoto(message, None, None)
+		sendLINEphoto(message, None, None, "RVfLyu9vCUrmT2NZ8DWxQkOYT8PpIJu8sKGKKx2ASW4")
 	elif b'photow,' in msg:
 		msg = msg.decode("utf-8")
 		text = msg.split(",",1)
 		print("text[0] is", (text[0]))
 		print("text[1] is", (text[1]))
 		message = mainTopic + " " + Version + ", photo " + text[1]
-		sendLINEphoto(message, None, text[1])
+		sendLINEphoto(message, None, text[1], "RVfLyu9vCUrmT2NZ8DWxQkOYT8PpIJu8sKGKKx2ASW4")
 	elif msg == b'details':
 		f = open("camInfo.txt", "r")
 		temp = f.read(4)
@@ -99,7 +99,7 @@ def callback(topic, msg):
 		sendLINEmsg(message)
 	elif msg == b'lineimage' or msg == b'linephoto':
 		message = mainTopic + " " + Version + ", photo"
-		sendLINEphoto(message, None, None)
+		sendLINEphoto(message, None, None, "RVfLyu9vCUrmT2NZ8DWxQkOYT8PpIJu8sKGKKx2ASW4")
 	elif msg == b'mqttimage' or msg == b'mqttphoto':
 		sensor.set_framesize(sensor.QVGA)
 		sensor.set_windowing(240,240)
@@ -143,7 +143,7 @@ def callback(topic, msg):
 			sendLINEmsg("Taking a picture in 5 seconds")
 			time.sleep_ms(5000)
 			message = "Photo no." + str(count)
-			sendLINEphoto(message, None, None)
+			sendLINEphoto(message, None, None, "MPkSNSnyyyxkeUqaGrcHZxtG6LNTj5vazBJmhtYshew")
 			time.sleep_ms(67000)
 			count = count + 1
 	elif msg == b'help':
@@ -180,7 +180,7 @@ def sendLINEmsg(msg):
 	print(LINE_Notify.read())
 	gc.collect()
 	LINE_Notify.close()
-def sendLINEphoto(msg,img,text):
+def sendLINEphoto(msg,img,text,token):
 	LINE_Notify = usocket.socket(usocket.AF_INET, usocket.SOCK_STREAM)
 	LINE_Notify.connect(addr)
 	LINE_Notify.settimeout(5.0)
@@ -241,7 +241,7 @@ def sendLINEphoto(msg,img,text):
 def detectFeed():
 	sensor.set_framesize(sensor.UXGA)
 	img = sensor.snapshot()
-	sendLINEphoto("Detecting feed:", img, None)
+	sendLINEphoto("Detecting feed:", img, None, "MPkSNSnyyyxkeUqaGrcHZxtG6LNTj5vazBJmhtYshew")
 	MQTT.publish(mainTopic+"/AI/Photo", img.compress(quality=90))
 	gc.collect()
 MQTT.publish(mainTopic + "/state", "ONLINE")
