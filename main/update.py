@@ -1,4 +1,4 @@
-Version = "v1.20"
+Version = "v1.21"
 import os, uos, network, usocket, ussl, sensor, image, machine, time, gc, pyb, tf, senko, urequests
 from mqtt import MQTTClient
 OTA = senko.Senko(user="SeahorseRTHK", repo="KFS-OTA", working_dir="main", files=["update.py"])
@@ -74,14 +74,32 @@ def callback(topic, msg):
 	print(topic, msg)
 	if msg == b'photo':
 		message = mainTopic + " " + Version + ", photo"
-		sendLINEphoto(message, None, None, "RVfLyu9vCUrmT2NZ8DWxQkOYT8PpIJu8sKGKKx2ASW4")
+		try:
+		    sendLINEphoto(message, None, None, "RVfLyu9vCUrmT2NZ8DWxQkOYT8PpIJu8sKGKKx2ASW4")
+		except:
+		    print("Error")
+		    message = "Error while sending image"
+		    try:
+			MQTT.publish(mainTopic+"/Alert", message)
+			sendLINEmsg(message)
+		    except:
+			machine.reset()
 	elif b'photow,' in msg:
 		msg = msg.decode("utf-8")
 		text = msg.split(",",1)
 		print("text[0] is", (text[0]))
 		print("text[1] is", (text[1]))
 		message = mainTopic + " " + Version + ", photo " + text[1]
-		sendLINEphoto(message, None, text[1], "RVfLyu9vCUrmT2NZ8DWxQkOYT8PpIJu8sKGKKx2ASW4")
+		try:
+		    sendLINEphoto(message, None, text[1], "RVfLyu9vCUrmT2NZ8DWxQkOYT8PpIJu8sKGKKx2ASW4")
+		except:
+		    print("Error")
+		    message = "Error while sending image"
+		    try:
+			MQTT.publish(mainTopic+"/Alert", message)
+			sendLINEmsg(message)
+		    except:
+			machine.reset()
 	elif msg == b'details':
 		f = open("camInfo.txt", "r")
 		temp = f.read(4)
@@ -99,7 +117,16 @@ def callback(topic, msg):
 		sendLINEmsg(message)
 	elif msg == b'lineimage' or msg == b'linephoto':
 		message = mainTopic + " " + Version + ", photo"
-		sendLINEphoto(message, None, None, "RVfLyu9vCUrmT2NZ8DWxQkOYT8PpIJu8sKGKKx2ASW4")
+		try:
+		    sendLINEphoto(message, None, None, "RVfLyu9vCUrmT2NZ8DWxQkOYT8PpIJu8sKGKKx2ASW4")
+		except:
+		    print("Error")
+		    message = "Error while sending image"
+		    try:
+			MQTT.publish(mainTopic+"/Alert", message)
+			sendLINEmsg(message)
+		    except:
+			machine.reset()
 	elif msg == b'mqttimage' or msg == b'mqttphoto':
 		sensor.set_framesize(sensor.QVGA)
 		sensor.set_windowing(240,240)
@@ -143,7 +170,16 @@ def callback(topic, msg):
 			sendLINEmsg("Taking a picture in 5 seconds")
 			time.sleep_ms(5000)
 			message = "Photo no." + str(count)
-			sendLINEphoto(message, None, None, "MPkSNSnyyyxkeUqaGrcHZxtG6LNTj5vazBJmhtYshew")
+			try:
+				sendLINEphoto(message, None, None, "MPkSNSnyyyxkeUqaGrcHZxtG6LNTj5vazBJmhtYshew")
+			except:
+				print("Error")
+				message = "Error while sending image"
+				try:
+				    MQTT.publish(mainTopic+"/Alert", message)
+				    sendLINEmsg(message)
+				except:
+				    machine.reset()
 			time.sleep_ms(67000)
 			count = count + 1
 	elif msg == b'help':
