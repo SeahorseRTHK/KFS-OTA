@@ -114,11 +114,9 @@ def callback(topic, msg):
         message = "Files on system: " + " ".join([(str(elem) + ",") for elem in read])
         print(message)
         MQTT.publish(mainTopic+"/Info/Files", message)
-        sendLINEmsg(message)
     elif msg == b'checkmem':
         message = "Available memory: " + str(gc.mem_free()) + "bytes of heap RAM"
         MQTT.publish(mainTopic+"/Info/Memory", message)
-        sendLINEmsg(message)
     elif msg == b'grayscale':
         sensor.set_pixformat(sensor.GRAYSCALE)
         message = "Camera set to grayscale"
